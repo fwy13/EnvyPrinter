@@ -43,7 +43,7 @@ function App() {
     const connectPrinter = async () => {
         setLoading(true);
         const device = await (navigator as any).bluetooth?.requestDevice({
-            filters: [{ services: [CAT_ADV_SRV, 0x180F] }],
+            filters: [{ services: [CAT_ADV_SRV] }],
             optionalServices: [CAT_PRINT_SRV],
         });
         const server = await device.gatt?.connect();
