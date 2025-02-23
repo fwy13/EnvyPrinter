@@ -1,15 +1,16 @@
-import { use, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import FileInput from "./components/FileInput.tsx";
-import ImagePrint from "./ImagePrint.tsx";
 import { useFile, usePrinter } from "./stores/store.ts";
 import {
     CAT_ADV_SRV,
     CAT_PRINT_RX_CHAR,
     CAT_PRINT_SRV,
     CAT_PRINT_TX_CHAR,
+    DEF_ENERGY,
+    DEF_SPEED,
 } from "./utils/const.ts";
 import { CatPrinter } from "./utils/cat-protocol.ts";
-import { grayToRgba, index, rgbaToGray } from "./utils/helper.ts";
+import { rgbaToBits } from "./utils/helper.ts";
 
 export type MessageWorker = {
     data: ImageData[];
@@ -24,15 +25,11 @@ function App() {
     const [isLoading, setLoading] = useState<boolean>(false);
     const [isImage, setImage] = useState<string>();
     const [isNameAlgorithm, setNameAlgorithm] = useState<string>();
-    const [isFactor, setFactor] = useState<number>(1);
-    const [isBrightness, setBrightness] = useState<number>(0);
     const [isDataPrint, setDataPrint] = useState<Uint8Array>();
-    const [isPage, setPage] = useState<number>(1);
+    const [isPage, setPage] = useState<number>(0);
     const useCanvas = useRef<HTMLCanvasElement>(null);
-    const [isCanvas, setCanvas] = useState<{
-        canvas: HTMLCanvasElement | null;
-        ctx: CanvasRenderingContext2D | null;
-    }>();
+    const useCanvasBill = useRef<HTMLCanvasElement>(null);
+    const [isMode, setMode] = useState<number>(0);
     const useWorker = useRef<Worker>(null);
     const [isDataImage, setDataImage] = useState<{
         w: number;
@@ -58,7 +55,7 @@ function App() {
             tx.writeValueWithoutResponse.bind(tx),
             false
         );
-        setPrinter(printer);
+        setPrinter({ print: printer, rx: rx });
     };
     const disconnectPrinter = async () => {
         isServerPrint.disconnect();
@@ -77,6 +74,65 @@ function App() {
             useWorker.current.terminate();
         };
     }, []);
+    useEffect(() => {
+        if (isMode === 1) {
+            setImage("abc");
+            const canvas = useCanvas.current!;
+            const ctx = canvas.getContext("2d");
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.font = "14px Arial";
+            ctx.fillStyle = "black";
+
+            const text = "HÓA ĐƠN THANH TOÁN";
+            ctx.fillText(
+                text,
+                canvas.width / 2 - ctx.measureText(text).width / 2,
+                20
+            );
+            ctx.fillText("Cửa hàng: Mini Portable Cat Printer", 10, 60);
+            ctx.fillText("Ngày: 16/02/2025 16:40", 10, 80);
+            ctx.fillText("Mã hóa đơn: #INV-20250216-1640", 10, 100);
+            ctx.beginPath();
+            ctx.moveTo(10, 110); // Điểm bắt đầu (10, 10)
+            ctx.lineTo(canvas.width - 10, 110); // Điểm kết thúc (200, 100)
+            ctx.stroke();
+            ctx.fillText("Tên", 10, 130);
+            ctx.fillText("Số lượng", 200, 130);
+            ctx.fillText(
+                "Tổng tiền",
+                384 - ctx.measureText("Tổng tiền").width - 10,
+                130
+            );
+            const products = [
+                {
+                    name: "Iphone 16 Pro Max",
+                    quantity: "1",
+                    price: "36.000.000",
+                },
+                {
+                    name: "Iphone 16 Pro Max",
+                    quantity: "1",
+                    price: "36.000.000",
+                },
+                {
+                    name: "Iphone 16 Pro Max",
+                    quantity: "1",
+                    price: "36.000.000",
+                },
+            ];
+            products.map((item, index) => {
+                ctx.fillText(item.name, 10, 140 + (index + 1) * 20);
+                ctx.fillText(item.quantity, 200, 140 + (index + 1) * 20);
+                ctx.fillText(
+                    item.price,
+                    384 - ctx.measureText(item.price).width - 10,
+                    140 + (index + 1) * 20
+                );
+            });
+        } else {
+            setImage("");
+        }
+    }, [isMode]);
     useEffect(() => {
         if (isFile !== null) {
             isFile.data!.onload = async (e) => {
@@ -99,7 +155,6 @@ function App() {
                         brightness: 0,
                         factor: 1,
                         type: 0,
-                        // 0=> Floyd, 1=> Atkinson, 2=> Jarvis Judice Ninke
                     });
                     let msg: any;
                     msg = await new Promise<MessageWorker>((resolve) => {
@@ -118,6 +173,7 @@ function App() {
                         );
                     });
                     setNameAlgorithm(msg.data.name);
+                    setDataPrint(new Uint8Array(msg.data.arr.data));
                     ctx.putImageData(msg.data.arr, 0, 0);
                     setImage(canvas.toDataURL());
                 };
@@ -127,7 +183,7 @@ function App() {
     }, [isFile]);
     const getDataImageBuffer = async () => {
         if (isDataImage) {
-            const canvas = document.createElement("canvas");
+            const canvas = useCanvas.current!;
             canvas.width = isDataImage.w;
             canvas.height = isDataImage.h;
             const ctx = canvas.getContext("2d");
@@ -138,7 +194,6 @@ function App() {
                 brightness: 0,
                 factor: 1,
                 type: isPage,
-                // 0=> Floyd, 1=> Atkinson, 2=> Jarvis Judice Ninke
             });
             let msg: any;
             msg = await new Promise<MessageWorker>((resolve) => {
@@ -150,12 +205,60 @@ function App() {
             });
             setNameAlgorithm(msg.data.name);
             ctx.putImageData(msg.data.arr, 0, 0);
+            setDataPrint(new Uint8Array(msg.data.arr.data));
             setImage(canvas.toDataURL());
         }
     };
     useEffect(() => {
         getDataImageBuffer();
-    }, [isPage]);
+    }, [isPage, isMode]);
+    useEffect(() => {
+        console.log(isMode);
+    }, [isMode]);
+    const print = async () => {
+        const bitImage = rgbaToBits(new Uint32Array(isDataPrint?.buffer));
+        const pitch = (isDataImage.w / 8) | 0;
+        const speed = +(localStorage.getItem("speed") || DEF_SPEED);
+        const energy = +(localStorage.getItem("energy") || DEF_ENERGY);
+        const finish_feed = +120;
+
+        const notifier = (event: Event) => {
+            //@ts-ignore:
+            const data: DataView = event.target.value;
+            const message = new Uint8Array(data.buffer);
+            const msg = isPrinter.print.notify(message);
+            console.log(msg);
+        };
+        let blank = 0;
+
+        // TODO: be aware of other printer state, like low power, no paper, overheat, etc.
+        await isPrinter.rx
+            .startNotifications()
+            .then(() =>
+                isPrinter.rx.addEventListener(
+                    "characteristicvaluechanged",
+                    notifier
+                )
+            )
+            .catch((error: Error) => console.log(error));
+
+        await isPrinter.print.prepare(speed, energy);
+        for (let i = 0; i < isDataImage.h * pitch; i += pitch) {
+            const line = bitImage.slice(i, i + pitch);
+            if (line.every((byte) => byte === 0)) {
+                blank += 1;
+            } else {
+                if (blank > 0) {
+                    await isPrinter.print.setSpeed(8);
+                    await isPrinter.print.feed(blank);
+                    await isPrinter.print.setSpeed(speed);
+                    blank = 0;
+                }
+                await isPrinter.print.draw(line);
+            }
+        }
+        await isPrinter.print.finish(blank + finish_feed);
+    };
     return (
         <div className="flex flex-col items-center h-screen pt-5 gap-3">
             <h1 className="text-3xl text-gray-200">
@@ -196,6 +299,7 @@ function App() {
                             name="radio-0"
                             id="radio-0"
                             className="radio radio-success"
+                            onClick={() => setMode(0)}
                             defaultChecked
                         />
                     </div>
@@ -205,6 +309,7 @@ function App() {
                             type="radio"
                             name="radio-0"
                             id="radio-0"
+                            onClick={() => setMode(1)}
                             className="radio radio-success"
                         />
                     </div>
@@ -214,6 +319,7 @@ function App() {
                             type="radio"
                             name="radio-0"
                             id="radio-0"
+                            onClick={() => setMode(2)}
                             className="radio radio-success"
                         />
                     </div>
@@ -223,22 +329,24 @@ function App() {
                             type="radio"
                             name="radio-0"
                             id="radio-0"
+                            onClick={() => setMode(3)}
                             className="radio radio-success"
                         />
                     </div>
                 </div>
             </div>
-            <FileInput />
+            <FileInput isMode={isMode} />
             <span>{isFile?.name}</span>
             <button
                 className="btn btn-dash w-[280px] btn-success hover:text-white"
                 disabled={!isPrinter}
+                onClick={print}
             >
                 In
             </button>
             <div className="flex flex-col gap-2 justify-center items-center">
                 <h1 className="text-white text-[1.25em]">
-                    Xem trước tại đây 👇 (nhớ chọn thuật toán!)
+                    Xem trước tại đây 👇
                 </h1>
                 <div
                     className={`w-[384px] border-2 ${
@@ -253,7 +361,9 @@ function App() {
                     } items-center gap-2`}
                 >
                     <button
-                        className="btn btn-circle btn-dash text-white hover:btn-success"
+                        className={`btn btn-circle btn-dash text-white hover:btn-success ${
+                            isMode !== 0 ? "hidden" : ""
+                        }`}
                         disabled={isPage === 0}
                         onClick={() => {
                             setPage(isPage - 1);
@@ -275,19 +385,17 @@ function App() {
                         </svg>
                     </button>
                     <div className="bg-white">
-                        <img
-                            src={isImage}
-                            width={384}
-                            className="border-2 border-dashed animate-fade-left"
-                        />
                         <canvas
                             width={384}
-                            className="border-2 border-dashed animate-fade-left hidden"
+                            height={400}
+                            className="border-2 border-dashed animate-fade-left"
                             ref={useCanvas}
-                        ></canvas>
+                        />
                     </div>
                     <button
-                        className="btn btn-circle btn-dash text-white hover:btn-success"
+                        className={`btn btn-circle btn-dash text-white hover:btn-success ${
+                            isMode !== 0 ? "hidden" : ""
+                        }`}
                         disabled={isPage === 2}
                         onClick={() => {
                             setPage(isPage + 1);
@@ -309,9 +417,11 @@ function App() {
                         </svg>
                     </button>
                 </div>
-                <h1 className="text-white text-[1.15em]">
-                    {isNameAlgorithm} 🚀
-                </h1>
+                {isNameAlgorithm && (
+                    <h1 className="text-white text-[1.15em]">
+                        {isNameAlgorithm} 🚀
+                    </h1>
+                )}
             </div>
         </div>
     );

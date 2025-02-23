@@ -120,7 +120,6 @@ export class CatPrinter {
 
     notify = (message: Uint8Array) => {
         const state = message[6];
-        console.log(message[6]);
         this.state = {
             out_of_paper: state & StateFlag.out_of_paper,
             cover: state & StateFlag.cover,
@@ -129,6 +128,7 @@ export class CatPrinter {
             pause: state & StateFlag.pause,
             busy: state & StateFlag.busy,
         };
+        return this.state;
     };
 
     isNewModel() {

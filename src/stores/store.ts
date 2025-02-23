@@ -2,8 +2,8 @@ import { create } from "zustand";
 import { CatPrinter } from "../utils/cat-protocol";
 
 export type Printer = {
-    isPrinter: CatPrinter | null;
-    setPrinter: (printer: CatPrinter | null) => void;
+    isPrinter: { print: CatPrinter; rx: any } | null;
+    setPrinter: (printer: { print: CatPrinter; rx: any } | null) => void;
 };
 
 export type File = {
@@ -24,7 +24,8 @@ export type File = {
 };
 export const usePrinter = create<Printer>((set) => ({
     isPrinter: null,
-    setPrinter: (printer) => set({ isPrinter: printer }),
+    setPrinter: (printer) =>
+        set({ isPrinter: { print: printer.print, rx: printer.rx } }),
 }));
 
 export const useFile = create<File>((set) => ({

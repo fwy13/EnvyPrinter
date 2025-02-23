@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useFile } from "../stores/store";
 
-const FileInput = () => {
+const FileInput: React.FC<{ isMode: number }> = (Props) => {
     const useInputFile = useRef<HTMLInputElement>(null);
     const [isDragOver, setDragOver] = useState<boolean>(false);
     const [isUploaded, setUploaded] = useState<boolean>(false);
@@ -54,7 +54,7 @@ const FileInput = () => {
         <div
             className={`animate-fade-down animate-once relative p-10 w-[400px] text-center rounded-xl border-3 border-dashed border-white ${
                 isDragOver ? "bg-[#3498db99]" : ""
-            }`}
+            } ${Props.isMode === 1 ? "hidden" : ""}`}
         >
             <div
                 className={`bg-[#34db9899] h-full absolute top-0 left-0 z-1 ${
